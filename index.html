@@ -199,6 +199,48 @@
             margin-bottom: 10px;
             border: 1px solid #ffc107;
         }
+        .mastery-progress {
+            display: inline-block;
+            background-color: #e7f1ff;
+            color: var(--secondary-color);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border: 1px solid var(--secondary-color);
+        }
+        .mastery-dots {
+            display: inline-block;
+            margin-left: 5px;
+        }
+        .mastery-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin: 0 2px;
+            background-color: #ddd;
+        }
+        .mastery-dot.filled {
+            background-color: #28a745;
+        }
+        .weak-areas-summary-card {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
+        .weak-areas-summary-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 2em;
+        }
+        .weak-areas-summary-card p {
+            margin: 0;
+            opacity: 0.9;
+        }
         #question-text { font-size: 1.2em; margin-bottom: 20px; white-space: pre-wrap; line-height: 1.5; }
         .option-btn { display: block; width: 100%; padding: 15px; font-size: 1em; text-align: left; background-color: #f9f9f9; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; margin-bottom: 10px; }
         .option-btn:hover:not(:disabled) { background-color: #e9e9e9; border-color: var(--primary-color); }
@@ -370,6 +412,14 @@
                 <button id="practice-btn" class="btn">Start Practice</button>
             </div>
             <div class="menu-option">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                </svg>
+                <h3>Review Weak Areas</h3>
+                <p>Focus on questions you haven't mastered yet. Get 5 correct in a row to master each one.</p>
+                <button id="review-weak-btn" class="btn">Review Weak Areas</button>
+            </div>
+            <div class="menu-option">
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-stopwatch" viewBox="0 0 16 16">
                     <path d="M8.5 5.5a.5.5 0 0 0-1 0v3.362l-1.429 2.38a.5.5 0 1 0 .858.515l1.5-2.5A.5.5 0 0 0 8.5 9V5.5z"/>
                     <path d="M6.5 1A.5.5 0 0 1 7 .5h2a.5.5 0 0 1 0 1v.57c1.36.196 2.594.78 3.584 1.64a.715.715 0 0 1 .012-.013l.354-.354-.354-.353a.5.5 0 0 1 .707-.708l1.414 1.415a.5.5 0 1 1-.707.707l-.353-.354-.354.354a.512.512 0 0 1-.013.012A7 7 0 1 1 7 2.071V1.5a.5.5 0 0 1-.5-.5zM8 3a6 6 0 1 0 .001 12A6 6 0 0 0 8 3z"/>
@@ -394,6 +444,17 @@
         <h2>Select a Chapter</h2>
         <div id="chapter-list" class="btn-container"></div>
         <button id="back-to-menu-btn" class="btn btn-secondary" style="margin-top: 15px;">Back to Menu</button>
+    </div>
+
+    <!-- Weak Areas Select Screen -->
+    <div id="weak-areas-container" class="main-content hidden">
+        <h2>⚠️ Review Weak Areas</h2>
+        <p style="text-align: center; color: #666; margin-bottom: 25px;">
+            Focus on questions you need to master. Answer correctly 5 times in a row to remove from this list.
+        </p>
+        <div id="weak-areas-summary" style="margin-bottom: 25px;"></div>
+        <div id="weak-areas-list" class="btn-container"></div>
+        <button id="back-to-menu-from-weak-btn" class="btn btn-secondary" style="margin-top: 15px;">Back to Menu</button>
     </div>
 
     <!-- Quiz Screen -->
@@ -1213,9 +1274,10 @@
     
     ];
     
-    
+
     const MOCK_EXAM_QUESTION_COUNT = 50;
     const MOCK_EXAM_DURATION_MINUTES = 90;
+    const MASTERY_THRESHOLD = 5; // Number of consecutive correct answers needed to master a question
 
     let currentMode = '';
     let currentQuestionIndex = 0;
@@ -1226,6 +1288,7 @@
 
     const menuContainer = document.getElementById('menu-container');
     const chapterSelectContainer = document.getElementById('chapter-select-container');
+    const weakAreasContainer = document.getElementById('weak-areas-container');
     const quizContainer = document.getElementById('quiz-container');
     const resultsContainer = document.getElementById('results-container');
     const statsContainer = document.getElementById('stats-container');
@@ -1263,7 +1326,8 @@
                 timesCorrect: 0,
                 timesWrong: 0,
                 lastAttemptDate: null,
-                isWrong: false
+                consecutiveCorrect: 0,
+                isMastered: false
             };
         }
 
@@ -1273,11 +1337,18 @@
 
         if (isCorrect) {
             qStat.timesCorrect++;
-            // Question is no longer marked as wrong if answered correctly
-            qStat.isWrong = false;
+            // Increment consecutive correct count
+            qStat.consecutiveCorrect = (qStat.consecutiveCorrect || 0) + 1;
+
+            // Check if mastered (5 consecutive correct answers)
+            if (qStat.consecutiveCorrect >= MASTERY_THRESHOLD) {
+                qStat.isMastered = true;
+            }
         } else {
             qStat.timesWrong++;
-            qStat.isWrong = true;
+            // Reset consecutive correct count to 0 when answered incorrectly
+            qStat.consecutiveCorrect = 0;
+            qStat.isMastered = false;
         }
 
         saveQuestionStats(stats);
@@ -1289,12 +1360,54 @@
         const wrongIds = [];
 
         for (const [id, qStat] of Object.entries(stats.questionStats)) {
-            if (qStat.section === section && qStat.isWrong) {
+            // A question is "weak" if it has been attempted and not yet mastered
+            const isWeak = qStat.timesAttempted > 0 && !qStat.isMastered && (qStat.consecutiveCorrect || 0) < MASTERY_THRESHOLD;
+            if (qStat.section === section && isWeak) {
                 wrongIds.push(parseInt(id));
             }
         }
 
         return wrongIds;
+    }
+
+    function getAllWeakQuestions() {
+        const stats = loadQuestionStats();
+        const weakIds = [];
+
+        for (const [id, qStat] of Object.entries(stats.questionStats)) {
+            // A question is "weak" if it has been attempted and not yet mastered
+            const isWeak = qStat.timesAttempted > 0 && !qStat.isMastered && (qStat.consecutiveCorrect || 0) < MASTERY_THRESHOLD;
+            if (isWeak) {
+                weakIds.push(parseInt(id));
+            }
+        }
+
+        return weakIds;
+    }
+
+    function getWeakQuestionCountBySection(section) {
+        return getWrongQuestionsBySection(section).length;
+    }
+
+    function getTotalWeakQuestionCount() {
+        return getAllWeakQuestions().length;
+    }
+
+    function getWeakQuestionsBySectionGrouped() {
+        const stats = loadQuestionStats();
+        const grouped = {};
+
+        for (const [id, qStat] of Object.entries(stats.questionStats)) {
+            const isWeak = qStat.timesAttempted > 0 && !qStat.isMastered && (qStat.consecutiveCorrect || 0) < MASTERY_THRESHOLD;
+            if (isWeak) {
+                if (!grouped[qStat.section]) {
+                    grouped[qStat.section] = [];
+                }
+                grouped[qStat.section].push(parseInt(id));
+            }
+        }
+
+        return grouped;
     }
 
     function getWrongAnswerCountBySection(section) {
@@ -1314,17 +1427,34 @@
         saveQuestionStats(stats);
     }
 
-    function isQuestionPreviouslyWrong(questionId) {
+    function isQuestionWeak(questionId) {
         const stats = loadQuestionStats();
-        return stats.questionStats[questionId]?.isWrong || false;
+        const qStat = stats.questionStats[questionId];
+        if (!qStat) return false;
+
+        return qStat.timesAttempted > 0 && !qStat.isMastered && (qStat.consecutiveCorrect || 0) < MASTERY_THRESHOLD;
+    }
+
+    function getQuestionMasteryProgress(questionId) {
+        const stats = loadQuestionStats();
+        const qStat = stats.questionStats[questionId];
+        if (!qStat) return { current: 0, required: MASTERY_THRESHOLD };
+
+        return {
+            current: qStat.consecutiveCorrect || 0,
+            required: MASTERY_THRESHOLD,
+            isMastered: qStat.isMastered || false
+        };
     }
 
     // ==================== END LOCAL STORAGE MANAGEMENT ====================
 
     document.getElementById('practice-btn').addEventListener('click', showChapterSelection);
+    document.getElementById('review-weak-btn').addEventListener('click', showWeakAreasSelection);
     document.getElementById('mock-exam-btn').addEventListener('click', startMockExam);
     document.getElementById('view-stats-btn').addEventListener('click', showStats);
     document.getElementById('back-to-menu-btn').addEventListener('click', showMenu);
+    document.getElementById('back-to-menu-from-weak-btn').addEventListener('click', showMenu);
     document.getElementById('menu-return-btn').addEventListener('click', showMenu);
     document.getElementById('stats-back-btn').addEventListener('click', showMenu);
     nextBtn.addEventListener('click', handleNextClick);
@@ -1352,7 +1482,7 @@
     });
 
     function showScreen(screen) {
-        [menuContainer, chapterSelectContainer, quizContainer, resultsContainer, statsContainer].forEach(container => {
+        [menuContainer, chapterSelectContainer, weakAreasContainer, quizContainer, resultsContainer, statsContainer].forEach(container => {
             container.classList.add('hidden');
         });
         screen.classList.remove('hidden');
@@ -1440,8 +1570,8 @@
                 <div class="stat-card-label">Sections Mastered</div>
             </div>
             <div class="stat-card">
-                <div class="stat-card-value">${Object.keys(stats.questionStats).filter(id => stats.questionStats[id].isWrong).length}</div>
-                <div class="stat-card-label">Questions to Review</div>
+                <div class="stat-card-value">${getTotalWeakQuestionCount()}</div>
+                <div class="stat-card-label">Questions to Master</div>
             </div>
         `;
     }
@@ -1744,6 +1874,96 @@
         showScreen(chapterSelectContainer);
     }
 
+    function showWeakAreasSelection() {
+        const totalWeak = getTotalWeakQuestionCount();
+
+        if (totalWeak === 0) {
+            alert('No weak areas to review! You\'ve mastered all attempted questions. 🎉');
+            return;
+        }
+
+        const weakAreasSummary = document.getElementById('weak-areas-summary');
+        weakAreasSummary.innerHTML = `
+            <div class="weak-areas-summary-card">
+                <h3>${totalWeak}</h3>
+                <p>Questions to Master</p>
+            </div>
+        `;
+
+        const weakAreasList = document.getElementById('weak-areas-list');
+        weakAreasList.innerHTML = '';
+
+        const grouped = getWeakQuestionsBySectionGrouped();
+        const sections = Object.keys(grouped).sort();
+
+        // Add "Review All" button at the top
+        const reviewAllContainer = document.createElement('div');
+        reviewAllContainer.style.marginBottom = '20px';
+        const reviewAllBtn = document.createElement('button');
+        reviewAllBtn.innerText = `Review All Weak Areas (${totalWeak} questions)`;
+        reviewAllBtn.classList.add('btn');
+        reviewAllBtn.style.width = '100%';
+        reviewAllBtn.addEventListener('click', () => startWeakAreasReview(null));
+        reviewAllContainer.appendChild(reviewAllBtn);
+        weakAreasList.appendChild(reviewAllContainer);
+
+        // Add section-specific buttons
+        sections.forEach(section => {
+            const weakCount = grouped[section].length;
+
+            const chapterItem = document.createElement('div');
+            chapterItem.classList.add('chapter-item');
+
+            const header = document.createElement('div');
+            header.classList.add('chapter-header');
+
+            const title = document.createElement('div');
+            title.classList.add('chapter-title');
+            title.innerText = section;
+            header.appendChild(title);
+
+            const badge = document.createElement('span');
+            badge.classList.add('wrong-count');
+            badge.innerText = `${weakCount} to master`;
+            header.appendChild(badge);
+
+            chapterItem.appendChild(header);
+
+            const reviewBtn = document.createElement('button');
+            reviewBtn.innerText = 'Review This Section';
+            reviewBtn.classList.add('chapter-btn');
+            reviewBtn.addEventListener('click', () => startWeakAreasReview(section));
+            chapterItem.appendChild(reviewBtn);
+
+            weakAreasList.appendChild(chapterItem);
+        });
+
+        showScreen(weakAreasContainer);
+    }
+
+    function startWeakAreasReview(section = null) {
+        currentMode = 'practice';
+        reviewWrongAnswersMode = true;
+
+        let weakIds;
+        if (section) {
+            // Review weak questions from specific section
+            weakIds = getWrongQuestionsBySection(section);
+        } else {
+            // Review all weak questions
+            weakIds = getAllWeakQuestions();
+        }
+
+        const weakQuestions = quizData.filter(q => weakIds.includes(q.id));
+
+        if (weakQuestions.length === 0) {
+            alert('No weak questions available. Great job!');
+            return;
+        }
+
+        startQuiz(weakQuestions);
+    }
+
     function startPractice(chapterName, reviewMode = false) {
         currentMode = 'practice';
         reviewWrongAnswersMode = reviewMode;
@@ -1788,18 +2008,34 @@
 
         questionNumberEl.innerText = `Question ${currentQuestionIndex + 1} of ${activeQuestions.length}`;
 
-        // Show badge if this question was previously answered incorrectly
-        if (isQuestionPreviouslyWrong(question.id) && !reviewWrongAnswersMode) {
+        questionTextEl.innerHTML = '';
+
+        // Show mastery progress for weak questions
+        const mastery = getQuestionMasteryProgress(question.id);
+        const isWeak = isQuestionWeak(question.id);
+
+        if (isWeak || mastery.current > 0) {
             const badge = document.createElement('div');
-            badge.classList.add('previously-wrong-badge');
-            badge.innerText = '⚠️ Previously answered incorrectly';
-            questionTextEl.innerHTML = '';
+
+            if (mastery.isMastered) {
+                badge.classList.add('mastery-progress');
+                badge.innerHTML = `✓ Mastered`;
+            } else if (mastery.current > 0) {
+                badge.classList.add('mastery-progress');
+                const dotsHTML = Array.from({length: MASTERY_THRESHOLD}, (_, i) =>
+                    `<span class="mastery-dot ${i < mastery.current ? 'filled' : ''}"></span>`
+                ).join('');
+                badge.innerHTML = `Mastery Progress: ${mastery.current}/${MASTERY_THRESHOLD} <span class="mastery-dots">${dotsHTML}</span>`;
+            } else {
+                badge.classList.add('previously-wrong-badge');
+                badge.innerHTML = `⚠️ Needs mastery: 0/${MASTERY_THRESHOLD} correct`;
+            }
+
             questionTextEl.appendChild(badge);
-            const textNode = document.createTextNode(question.questionText);
-            questionTextEl.appendChild(textNode);
-        } else {
-            questionTextEl.innerText = question.questionText;
         }
+
+        const textNode = document.createTextNode(question.questionText);
+        questionTextEl.appendChild(textNode);
 
         for (const [key, value] of Object.entries(question.options)) {
             const button = document.createElement('button');
