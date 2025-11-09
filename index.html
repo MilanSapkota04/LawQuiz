@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Law for Accountants Toolkit App</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --primary-color: #003366;
@@ -221,6 +222,133 @@
         .result-incorrect { border-left: 5px solid var(--incorrect-text); }
         .user-answer { color: var(--incorrect-text); }
         .correct-answer { color: var(--correct-text); }
+
+        /* Stats Screen Styles */
+        #stats-container h2 { text-align: center; color: var(--primary-color); margin-bottom: 30px; }
+        .stats-section { margin-bottom: 30px; }
+        .stats-section h3 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
+        .stat-card-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-card-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .session-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #fafafa;
+        }
+        .session-item {
+            background-color: white;
+            border-left: 4px solid var(--secondary-color);
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .session-item.review-mode {
+            border-left-color: #dc3545;
+        }
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .session-title {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        .session-date {
+            font-size: 0.85em;
+            color: #666;
+        }
+        .session-score {
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .session-score.good { color: var(--correct-text); }
+        .session-score.medium { color: #856404; }
+        .session-score.poor { color: var(--incorrect-text); }
+        .session-mode {
+            font-size: 0.85em;
+            color: #666;
+            font-style: italic;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 25px;
+        }
+        .no-data-message {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-style: italic;
+        }
+        .section-stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .section-stats-table th {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        .section-stats-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .section-stats-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .mastery-indicator {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .mastery-high {
+            background-color: var(--correct-bg);
+            color: var(--correct-text);
+        }
+        .mastery-medium {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .mastery-low {
+            background-color: var(--incorrect-bg);
+            color: var(--incorrect-text);
+        }
     </style>
 </head>
 <body>
@@ -249,6 +377,14 @@
                 <h3>Mock Exam</h3>
                 <p>A timed, 50-question exam simulation. Results are shown at the end.</p>
                 <button id="mock-exam-btn" class="btn">Start Mock Exam</button>
+            </div>
+            <div class="menu-option">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M4 11H2v3h2v-3zm5-4H7v7h2V7zm5-5v12h-2V2h2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1h-2zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-3z"/>
+                </svg>
+                <h3>View Progress</h3>
+                <p>Track your performance, review session history, and see your learning progress.</p>
+                <button id="view-stats-btn" class="btn">View Stats</button>
             </div>
         </div>
     </div>
@@ -282,6 +418,42 @@
         <p id="final-feedback"></p>
         <div id="results-details"></div>
         <button id="menu-return-btn" class="btn">Back to Main Menu</button>
+    </div>
+
+    <!-- Stats Screen -->
+    <div id="stats-container" class="main-content hidden">
+        <h2>📊 Your Learning Progress</h2>
+
+        <div class="stats-section">
+            <h3>Overall Statistics</h3>
+            <div class="stat-cards" id="stat-cards-container"></div>
+        </div>
+
+        <div class="stats-section">
+            <h3>Score Trend</h3>
+            <div class="chart-container">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="stats-section">
+            <h3>Performance by Section</h3>
+            <div class="chart-container">
+                <canvas id="sectionChart"></canvas>
+            </div>
+        </div>
+
+        <div class="stats-section">
+            <h3>Section Statistics</h3>
+            <div id="section-stats-table-container"></div>
+        </div>
+
+        <div class="stats-section">
+            <h3>Recent Sessions</h3>
+            <div class="session-list" id="session-list-container"></div>
+        </div>
+
+        <button id="stats-back-btn" class="btn btn-secondary" style="margin-top: 20px;">Back to Main Menu</button>
     </div>
 </div>
 
@@ -1056,6 +1228,7 @@
     const chapterSelectContainer = document.getElementById('chapter-select-container');
     const quizContainer = document.getElementById('quiz-container');
     const resultsContainer = document.getElementById('results-container');
+    const statsContainer = document.getElementById('stats-container');
     const chapterListEl = document.getElementById('chapter-list');
     const questionNumberEl = document.getElementById('question-number');
     const timerEl = document.getElementById('timer');
@@ -1150,8 +1323,10 @@
 
     document.getElementById('practice-btn').addEventListener('click', showChapterSelection);
     document.getElementById('mock-exam-btn').addEventListener('click', startMockExam);
+    document.getElementById('view-stats-btn').addEventListener('click', showStats);
     document.getElementById('back-to-menu-btn').addEventListener('click', showMenu);
     document.getElementById('menu-return-btn').addEventListener('click', showMenu);
+    document.getElementById('stats-back-btn').addEventListener('click', showMenu);
     nextBtn.addEventListener('click', handleNextClick);
 
     let isConfirmingQuit = false;
@@ -1177,7 +1352,7 @@
     });
 
     function showScreen(screen) {
-        [menuContainer, chapterSelectContainer, quizContainer, resultsContainer].forEach(container => {
+        [menuContainer, chapterSelectContainer, quizContainer, resultsContainer, statsContainer].forEach(container => {
             container.classList.add('hidden');
         });
         screen.classList.remove('hidden');
@@ -1190,6 +1365,328 @@
         resetQuitButtonState();
         reviewWrongAnswersMode = false;
     }
+
+    // ==================== STATS SCREEN FUNCTIONS ====================
+
+    let trendChartInstance = null;
+    let sectionChartInstance = null;
+
+    function showStats() {
+        const stats = loadQuestionStats();
+
+        if (stats.sessionHistory.length === 0) {
+            // Show a message if no data yet
+            statsContainer.innerHTML = `
+                <h2>📊 Your Learning Progress</h2>
+                <div class="no-data-message">
+                    <p>No session data yet. Start practicing to see your progress!</p>
+                    <button id="stats-back-btn-temp" class="btn btn-secondary" style="margin-top: 20px;">Back to Main Menu</button>
+                </div>
+            `;
+            document.getElementById('stats-back-btn-temp').addEventListener('click', showMenu);
+            showScreen(statsContainer);
+            return;
+        }
+
+        showScreen(statsContainer);
+        renderOverallStats(stats);
+        renderSessionHistory(stats);
+        renderTrendChart(stats);
+        renderSectionChart(stats);
+        renderSectionStatsTable(stats);
+    }
+
+    function renderOverallStats(stats) {
+        const sessions = stats.sessionHistory;
+        const totalSessions = sessions.length;
+
+        let totalScore = 0;
+        let totalQuestions = 0;
+        sessions.forEach(s => {
+            totalScore += s.score;
+            totalQuestions += s.total;
+        });
+
+        const avgScore = totalQuestions > 0 ? Math.round((totalScore / totalQuestions) * 100) : 0;
+
+        // Count sections with high mastery (>= 80% average)
+        const sectionPerformance = {};
+        sessions.forEach(s => {
+            if (!sectionPerformance[s.section]) {
+                sectionPerformance[s.section] = { total: 0, correct: 0 };
+            }
+            sectionPerformance[s.section].total += s.total;
+            sectionPerformance[s.section].correct += s.score;
+        });
+
+        const sections = Object.keys(sectionPerformance);
+        const masteredSections = sections.filter(section => {
+            const perf = sectionPerformance[section];
+            return (perf.correct / perf.total) >= 0.8;
+        }).length;
+
+        const container = document.getElementById('stat-cards-container');
+        container.innerHTML = `
+            <div class="stat-card">
+                <div class="stat-card-value">${totalSessions}</div>
+                <div class="stat-card-label">Total Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value">${avgScore}%</div>
+                <div class="stat-card-label">Average Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value">${masteredSections}/${sections.length}</div>
+                <div class="stat-card-label">Sections Mastered</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value">${Object.keys(stats.questionStats).filter(id => stats.questionStats[id].isWrong).length}</div>
+                <div class="stat-card-label">Questions to Review</div>
+            </div>
+        `;
+    }
+
+    function renderSessionHistory(stats) {
+        const sessions = stats.sessionHistory.slice().reverse().slice(0, 20); // Last 20 sessions
+        const container = document.getElementById('session-list-container');
+
+        if (sessions.length === 0) {
+            container.innerHTML = '<div class="no-data-message">No sessions yet.</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        sessions.forEach(session => {
+            const percentage = Math.round((session.score / session.total) * 100);
+            const scoreClass = percentage >= 80 ? 'good' : percentage >= 60 ? 'medium' : 'poor';
+
+            const date = new Date(session.date);
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+            const modeStr = session.mode === 'mock' ? 'Mock Exam' : session.reviewMode ? 'Review Mode' : 'Practice';
+
+            const item = document.createElement('div');
+            item.classList.add('session-item');
+            if (session.reviewMode) item.classList.add('review-mode');
+
+            item.innerHTML = `
+                <div class="session-header">
+                    <div class="session-title">${session.section}</div>
+                    <div class="session-date">${dateStr}</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="session-mode">${modeStr}</div>
+                    <div class="session-score ${scoreClass}">${session.score}/${session.total} (${percentage}%)</div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function renderTrendChart(stats) {
+        const ctx = document.getElementById('trendChart');
+
+        // Destroy previous chart if exists
+        if (trendChartInstance) {
+            trendChartInstance.destroy();
+        }
+
+        const sessions = stats.sessionHistory.slice(-15); // Last 15 sessions
+
+        if (sessions.length === 0) {
+            ctx.parentElement.innerHTML = '<div class="no-data-message">Not enough data for trend chart.</div>';
+            return;
+        }
+
+        const labels = sessions.map((s, i) => {
+            const date = new Date(s.date);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        });
+
+        const scores = sessions.map(s => Math.round((s.score / s.total) * 100));
+
+        trendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Score %',
+                    data: scores,
+                    borderColor: '#0056b3',
+                    backgroundColor: 'rgba(0, 86, 179, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderSectionChart(stats) {
+        const ctx = document.getElementById('sectionChart');
+
+        // Destroy previous chart if exists
+        if (sectionChartInstance) {
+            sectionChartInstance.destroy();
+        }
+
+        // Calculate average score per section
+        const sectionPerformance = {};
+        stats.sessionHistory.forEach(s => {
+            if (!sectionPerformance[s.section]) {
+                sectionPerformance[s.section] = { total: 0, correct: 0 };
+            }
+            sectionPerformance[s.section].total += s.total;
+            sectionPerformance[s.section].correct += s.score;
+        });
+
+        const sections = Object.keys(sectionPerformance);
+        if (sections.length === 0) {
+            ctx.parentElement.innerHTML = '<div class="no-data-message">Not enough data for section chart.</div>';
+            return;
+        }
+
+        const averages = sections.map(section => {
+            const perf = sectionPerformance[section];
+            return Math.round((perf.correct / perf.total) * 100);
+        });
+
+        // Shorten section names for display
+        const labels = sections.map(s => {
+            const parts = s.split('.');
+            return parts.length > 1 ? parts[1].trim().substring(0, 20) : s.substring(0, 20);
+        });
+
+        sectionChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Average Score %',
+                    data: averages,
+                    backgroundColor: averages.map(score =>
+                        score >= 80 ? '#28a745' : score >= 60 ? '#ffc107' : '#dc3545'
+                    )
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderSectionStatsTable(stats) {
+        const container = document.getElementById('section-stats-table-container');
+
+        // Calculate stats per section
+        const sectionStats = {};
+        stats.sessionHistory.forEach(s => {
+            if (!sectionStats[s.section]) {
+                sectionStats[s.section] = { sessions: 0, total: 0, correct: 0, bestScore: 0 };
+            }
+            sectionStats[s.section].sessions++;
+            sectionStats[s.section].total += s.total;
+            sectionStats[s.section].correct += s.score;
+            const percentage = (s.score / s.total) * 100;
+            if (percentage > sectionStats[s.section].bestScore) {
+                sectionStats[s.section].bestScore = percentage;
+            }
+        });
+
+        const sections = Object.keys(sectionStats).sort();
+
+        if (sections.length === 0) {
+            container.innerHTML = '<div class="no-data-message">No section data available.</div>';
+            return;
+        }
+
+        let tableHTML = `
+            <table class="section-stats-table">
+                <thead>
+                    <tr>
+                        <th>Section</th>
+                        <th>Sessions</th>
+                        <th>Avg Score</th>
+                        <th>Best Score</th>
+                        <th>Mastery</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        sections.forEach(section => {
+            const stat = sectionStats[section];
+            const avgScore = Math.round((stat.correct / stat.total) * 100);
+            const bestScore = Math.round(stat.bestScore);
+
+            let masteryClass = 'mastery-low';
+            let masteryLabel = 'Needs Work';
+            if (avgScore >= 80) {
+                masteryClass = 'mastery-high';
+                masteryLabel = 'Mastered';
+            } else if (avgScore >= 60) {
+                masteryClass = 'mastery-medium';
+                masteryLabel = 'Good';
+            }
+
+            tableHTML += `
+                <tr>
+                    <td>${section}</td>
+                    <td>${stat.sessions}</td>
+                    <td>${avgScore}%</td>
+                    <td>${bestScore}%</td>
+                    <td><span class="mastery-indicator ${masteryClass}">${masteryLabel}</span></td>
+                </tr>
+            `;
+        });
+
+        tableHTML += '</tbody></table>';
+        container.innerHTML = tableHTML;
+    }
+
+    // ==================== END STATS SCREEN FUNCTIONS ====================
 
     function showChapterSelection() {
         chapterListEl.innerHTML = '';
