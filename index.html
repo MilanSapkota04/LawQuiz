@@ -190,6 +190,15 @@
                 <button id="practice-btn" class="btn">Start Practice</button>
             </div>
             <div class="menu-option">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
+                </svg>
+                <h3>Review Wrong Answers</h3>
+                <p>Practice questions you've answered incorrectly until you master them (5 correct in a row).</p>
+                <button id="review-btn" class="btn">Start Review</button>
+            </div>
+            <div class="menu-option">
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" class="bi bi-stopwatch" viewBox="0 0 16 16">
                     <path d="M8.5 5.5a.5.5 0 0 0-1 0v3.362l-1.429 2.38a.5.5 0 1 0 .858.515l1.5-2.5A.5.5 0 0 0 8.5 9V5.5z"/>
                     <path d="M6.5 1A.5.5 0 0 1 7 .5h2a.5.5 0 0 1 0 1v.57c1.36.196 2.594.78 3.584 1.64a.715.715 0 0 1 .012-.013l.354-.354-.354-.353a.5.5 0 0 1 .707-.708l1.414 1.415a.5.5 0 1 1-.707.707l-.353-.354-.354.354a.512.512 0 0 1-.013.012A7 7 0 1 1 7 2.071V1.5a.5.5 0 0 1-.5-.5zM8 3a6 6 0 1 0 .001 12A6 6 0 0 0 8 3z"/>
@@ -999,6 +1008,59 @@
     let activeQuestions = [];
     let timerInterval;
 
+    // LocalStorage key for question history
+    const QUESTION_HISTORY_KEY = 'lawQuizQuestionHistory';
+
+    // Load question history from localStorage
+    function loadQuestionHistory() {
+        const stored = localStorage.getItem(QUESTION_HISTORY_KEY);
+        return stored ? JSON.parse(stored) : {};
+    }
+
+    // Save question history to localStorage
+    function saveQuestionHistory(history) {
+        localStorage.setItem(QUESTION_HISTORY_KEY, JSON.stringify(history));
+    }
+
+    // Update question stats in history
+    function updateQuestionStats(questionId, isCorrect) {
+        const history = loadQuestionHistory();
+
+        if (!history[questionId]) {
+            history[questionId] = {
+                incorrectCount: 0,
+                consecutiveCorrect: 0,
+                isMastered: false
+            };
+        }
+
+        if (isCorrect) {
+            history[questionId].consecutiveCorrect++;
+            // Mark as mastered if answered correctly 5 times in a row
+            if (history[questionId].consecutiveCorrect >= 5) {
+                history[questionId].isMastered = true;
+            }
+        } else {
+            history[questionId].incorrectCount++;
+            history[questionId].consecutiveCorrect = 0; // Reset streak
+            history[questionId].isMastered = false; // Lost mastery
+        }
+
+        saveQuestionHistory(history);
+        return history[questionId];
+    }
+
+    // Get questions that were answered incorrectly and not yet mastered
+    function getQuestionsToReview() {
+        const history = loadQuestionHistory();
+        return quizData.filter(q => {
+            const stats = history[q.id];
+            // Include questions that have been answered incorrectly at least once
+            // and are not yet mastered
+            return stats && stats.incorrectCount > 0 && !stats.isMastered;
+        });
+    }
+
     const menuContainer = document.getElementById('menu-container');
     const chapterSelectContainer = document.getElementById('chapter-select-container');
     const quizContainer = document.getElementById('quiz-container');
@@ -1016,6 +1078,7 @@
     const resultsDetailsEl = document.getElementById('results-details');
 
     document.getElementById('practice-btn').addEventListener('click', showChapterSelection);
+    document.getElementById('review-btn').addEventListener('click', startReviewWrongAnswers);
     document.getElementById('mock-exam-btn').addEventListener('click', startMockExam);
     document.getElementById('back-to-menu-btn').addEventListener('click', showMenu);
     document.getElementById('menu-return-btn').addEventListener('click', showMenu);
@@ -1076,6 +1139,18 @@
         startQuiz(chapterQuestions);
     }
 
+    function startReviewWrongAnswers() {
+        currentMode = 'review';
+        const questionsToReview = getQuestionsToReview();
+
+        if (questionsToReview.length === 0) {
+            alert('No questions to review! Either you haven\'t answered any questions incorrectly yet, or you\'ve mastered all your wrong answers. Great job!');
+            return;
+        }
+
+        startQuiz(questionsToReview);
+    }
+
     function startMockExam() {
         currentMode = 'mock';
         const shuffled = [...quizData].sort(() => 0.5 - Math.random());
@@ -1123,16 +1198,39 @@
 
     function handleAnswer(selectedKey, button) {
         const correctKey = activeQuestions[currentQuestionIndex].correctAnswer;
+        const questionId = activeQuestions[currentQuestionIndex].id;
         activeQuestions[currentQuestionIndex].userAnswer = selectedKey;
 
-        if (currentMode === 'practice') {
+        if (currentMode === 'practice' || currentMode === 'review') {
             const isCorrect = selectedKey === correctKey;
+
+            // Update question stats in localStorage
+            const stats = updateQuestionStats(questionId, isCorrect);
+
             if (isCorrect) {
                 score++;
-                feedbackContainerEl.innerText = 'Correct!';
+                let feedbackText = 'Correct!';
+
+                // Show mastery progress in review mode
+                if (currentMode === 'review') {
+                    if (stats.isMastered) {
+                        feedbackText = `Correct! 🎉 Question mastered! (${stats.consecutiveCorrect}/5 correct in a row)`;
+                    } else {
+                        feedbackText = `Correct! Progress: ${stats.consecutiveCorrect}/5 correct in a row to master this question.`;
+                    }
+                }
+
+                feedbackContainerEl.innerText = feedbackText;
                 feedbackContainerEl.classList.add('correct');
             } else {
-                feedbackContainerEl.innerText = `Incorrect. The correct answer is ${correctKey}.`;
+                let feedbackText = `Incorrect. The correct answer is ${correctKey}.`;
+
+                // Show streak reset in review mode
+                if (currentMode === 'review') {
+                    feedbackText += ` (Streak reset - you'll need 5 correct in a row to master this question)`;
+                }
+
+                feedbackContainerEl.innerText = feedbackText;
                 feedbackContainerEl.classList.add('incorrect');
             }
             Array.from(optionsContainerEl.children).forEach(btn => {
@@ -1184,7 +1282,7 @@
     
     function showResults() {
         if(timerInterval) clearInterval(timerInterval);
-        
+
         let correctAnswers = 0;
         activeQuestions.forEach(q => {
             if (q.userAnswer === q.correctAnswer) {
@@ -1193,25 +1291,48 @@
         });
 
         showScreen(resultsContainer);
-        
+
         if (currentMode === 'mock') {
             const finalScore = correctAnswers * 2;
             const totalPossibleScore = MOCK_EXAM_QUESTION_COUNT * 2;
             scoreTextEl.innerText = `Your Score: ${finalScore} / ${totalPossibleScore} (${finalScore}%)`;
             finalFeedbackEl.innerText = finalScore >= 50 ? "Congratulations, you passed!" : "Keep practicing, you'll get there!";
+        } else if (currentMode === 'review') {
+            // Review mode - show mastery progress
+            const scorePercent = Math.round((correctAnswers / activeQuestions.length) * 100);
+            const history = loadQuestionHistory();
+            let masteredCount = 0;
+            let stillToReview = 0;
+
+            activeQuestions.forEach(q => {
+                const stats = history[q.id];
+                if (stats && stats.isMastered) {
+                    masteredCount++;
+                } else if (stats && stats.incorrectCount > 0) {
+                    stillToReview++;
+                }
+            });
+
+            scoreTextEl.innerText = `Your Score: ${correctAnswers} out of ${activeQuestions.length} (${scorePercent}%)`;
+
+            if (masteredCount > 0) {
+                finalFeedbackEl.innerText = `Great! You mastered ${masteredCount} question(s) in this session! ${stillToReview > 0 ? `Keep practicing the remaining ${stillToReview} question(s).` : 'All reviewed questions are now mastered!'}`;
+            } else {
+                finalFeedbackEl.innerText = `Keep going! You need to answer each question correctly 5 times in a row to master it.`;
+            }
         } else {
             const scorePercent = Math.round((correctAnswers / activeQuestions.length) * 100);
             scoreTextEl.innerText = `Your Score: ${correctAnswers} out of ${activeQuestions.length} (${scorePercent}%)`;
             finalFeedbackEl.innerText = scorePercent === 100 ? "Excellent work!" : "Practice complete!";
         }
-        
+
         resultsDetailsEl.innerHTML = '';
         if (currentMode === 'mock') {
             activeQuestions.forEach((question, index) => {
                 const isCorrect = question.userAnswer === question.correctAnswer;
                 const resultItem = document.createElement('div');
                 resultItem.classList.add('result-item', isCorrect ? 'result-correct' : 'result-incorrect');
-                
+
                 let answerDetails = '';
                 if (!isCorrect) {
                     const userAnswerText = question.userAnswer ? `${question.userAnswer}. ${question.options[question.userAnswer]}` : 'Not answered';
@@ -1226,6 +1347,42 @@
                     <p><b>Question ${index + 1}: ${isCorrect ? 'Correct' : 'Incorrect'}</b></p>
                     <p class="result-item-q">${question.questionText}</p>
                     ${answerDetails}
+                `;
+                resultsDetailsEl.appendChild(resultItem);
+            });
+        } else if (currentMode === 'review') {
+            // Show detailed mastery progress for review mode
+            const history = loadQuestionHistory();
+            activeQuestions.forEach((question, index) => {
+                const isCorrect = question.userAnswer === question.correctAnswer;
+                const stats = history[question.id];
+                const resultItem = document.createElement('div');
+                resultItem.classList.add('result-item', isCorrect ? 'result-correct' : 'result-incorrect');
+
+                let masteryStatus = '';
+                if (stats) {
+                    if (stats.isMastered) {
+                        masteryStatus = `<p><strong>✓ Mastered!</strong> (${stats.consecutiveCorrect}/5 correct in a row)</p>`;
+                    } else {
+                        masteryStatus = `<p><strong>Progress:</strong> ${stats.consecutiveCorrect}/5 correct in a row</p>`;
+                    }
+                }
+
+                let answerDetails = '';
+                if (!isCorrect) {
+                    const userAnswerText = question.userAnswer ? `${question.userAnswer}. ${question.options[question.userAnswer]}` : 'Not answered';
+                    const correctAnswerText = `${question.correctAnswer}. ${question.options[question.correctAnswer]}`;
+                    answerDetails = `
+                        <p>Your answer: <span class="user-answer">${userAnswerText}</span></p>
+                        <p>Correct answer: <span class="correct-answer">${correctAnswerText}</span></p>
+                    `;
+                }
+
+                resultItem.innerHTML = `
+                    <p><b>Question ${index + 1}: ${isCorrect ? 'Correct' : 'Incorrect'}</b></p>
+                    <p class="result-item-q">${question.questionText}</p>
+                    ${answerDetails}
+                    ${masteryStatus}
                 `;
                 resultsDetailsEl.appendChild(resultItem);
             });
