@@ -1355,14 +1355,29 @@
         return stats;
     }
 
-    function getWrongQuestionsBySection(section) {
+    function getWeakQuestionsBySection(section) {
         const stats = loadQuestionStats();
-        const wrongIds = [];
+        const weakIds = [];
 
         for (const [id, qStat] of Object.entries(stats.questionStats)) {
             // A question is "weak" if it has been attempted and not yet mastered
             const isWeak = qStat.timesAttempted > 0 && !qStat.isMastered && (qStat.consecutiveCorrect || 0) < MASTERY_THRESHOLD;
             if (qStat.section === section && isWeak) {
+                weakIds.push(parseInt(id));
+            }
+        }
+
+        return weakIds;
+    }
+
+    function getWrongQuestionsBySection(section) {
+        const stats = loadQuestionStats();
+        const wrongIds = [];
+
+        for (const [id, qStat] of Object.entries(stats.questionStats)) {
+            // A question is "wrong" if it has been answered incorrectly at least once and not yet mastered
+            const isWrong = qStat.timesWrong > 0 && !qStat.isMastered;
+            if (qStat.section === section && isWrong) {
                 wrongIds.push(parseInt(id));
             }
         }
@@ -1386,7 +1401,7 @@
     }
 
     function getWeakQuestionCountBySection(section) {
-        return getWrongQuestionsBySection(section).length;
+        return getWeakQuestionsBySection(section).length;
     }
 
     function getTotalWeakQuestionCount() {
@@ -1947,10 +1962,10 @@
 
         let weakIds;
         if (section) {
-            // Review weak questions from specific section
-            weakIds = getWrongQuestionsBySection(section);
+            // Review weak questions from specific section (all unmastered)
+            weakIds = getWeakQuestionsBySection(section);
         } else {
-            // Review all weak questions
+            // Review all weak questions (all unmastered)
             weakIds = getAllWeakQuestions();
         }
 
